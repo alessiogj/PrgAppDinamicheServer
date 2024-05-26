@@ -15,5 +15,8 @@ coverage
 .vscode
 .idea
 
+#MAC
+.DS_Store
+
 # Benchmarking
 benchmarks/graphs
