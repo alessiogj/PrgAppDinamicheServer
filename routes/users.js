@@ -1,6 +1,7 @@
 const express = require("express")
 const {json} = require("express");
 const bodyParser = require('body-parser');
+const bcrypt = require("bcrypt")
 const router = express.Router();
 const saltRounds = 10;
 
@@ -18,77 +19,45 @@ var pool = new Pool({
     connectionString: conString
 });
 
-//endpoint to retrieve the password salt of the corresponding user
-router.post('/salt', (req, res) => {
-    const username = req.body.username;
-
-    pool.connect((err, client, done) => {
-        if (err) {
-            console.error('Error fetching client from pool', err);
-            return res.status(500).json({ error: 'Database connection error' });
-        }
-        client.query("SELECT cust_code, username, salt from users where username=$1", [username], function(err, result) {
-            done();
-            if (err) {
-                return console.error('error running query', err);
-                //a
-            }
-            res.send(result.rows[0])
-        });
-    });
-})
-
+//endpoint for user login, require an user id and the password for that user
 router.post("/login", (req,res) => {
-    const hash = req.body.hash;
+    const userPassword = req.body.password;
     const usId = req.body.id;
 
     pool.connect(function(err, client, done) {
         if (err) {
-            return console.error('error fetching client from pool', err);
+            console.error('error fetching client from pool', err);
+            return res.status(500).json({ error: 'Database connection error' });
         }
-        client.query("SELECT password from users where cust_cod=$1", [usId], function(err, result) {
+        client.query("SELECT password from users where cust_code=$1", [usId], function(err, result) {
             done();
             if (err) {
-                return console.error('error running query', err);
+                console.error('error running query', err);
+                return res.status(500).json({ error: 'Query to database failed' });
             }
-            res.send(result.rows[0])
-        });
-    });
-
-    bcrypt
-        .compare(password, hash)
-        .then(res => {
-            console.log(res) // return true
-        })
-        .catch(err => console.error(err.message))
-
-})
-
-/*router.get("/login", (req, res) => {
-    //azioni della richiesta
-    //connessione a un db
-    pool.connect(function(err, client, done) {
-        if (err) {
-            return console.error('error fetching client from pool', err);
-        }
-        client.query("SELECT salt, username from users where cust_code = 'A007' ", function(err, result) {
-            done();
-
-            if (err) {
-                console.error('Error running query', err);
-                return res.status(500).json({ error: 'Error running query' });
+            if (result.rows.length > 0) {
+                const storedHash = result.rows[0].password;
+                bcrypt
+                    .compare(userPassword, storedHash)
+                    .then(result => {
+                        if(result){
+                            res.send("corrisponde")
+                        }
+                        else{
+                            return res.status(401).json({ error: 'Invalid Password' });
+                        }
+                    })
+                    .catch(err => console.error(err.message))
             }
-
-            if (result.rows.length === 0) {
+            else{
                 return res.status(404).json({ error: 'User not found' });
             }
 
-            res.json({ salt: result.rows[0].salt });
-            console.log('Salt retrieved:', result.rows[0].salt);
         });
     });
-});
 
+})
+/*
 // Endpoint per il login dell'utente
 router.post('/login', (req, res) => {
     const { username, password } = req.body;
@@ -120,7 +89,7 @@ router.post('/login', (req, res) => {
             }
         });
     });
-});
+});*/
 
 
 module.exports = router
