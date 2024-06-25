@@ -2,6 +2,8 @@ const express = require("express")
 const {json} = require("express");
 const bodyParser = require('body-parser');
 const bcrypt = require("bcrypt")
+const config = require('../config');
+const jwt = require("jsonwebtoken");
 const router = express.Router();
 const saltRounds = 10;
 
@@ -27,24 +29,43 @@ router.post("/login", (req,res) => {
     pool.connect(function(err, client, done) {
         if (err) {
             console.error('error fetching client from pool', err);
-            return res.status(500).json({ error: 'Database connection error' });
+            res.status(500).json({ error: 'Database connection error' });
         }
-        client.query("SELECT password from users where cust_code=$1", [usId], function(err, result) {
+        //recupero della password hashata nel db e del ruolo dell'utente
+        client.query("SELECT password,user_role from users where cust_code=$1", [usId], function(err, result) {
             done();
             if (err) {
                 console.error('error running query', err);
-                return res.status(500).json({ error: 'Query to database failed' });
+                res.status(500).json({ error: 'Query to database failed' });
             }
             if (result.rows.length > 0) {
                 const storedHash = result.rows[0].password;
+                const role = result.rows[0].user_role;
                 bcrypt
                     .compare(userPassword, storedHash)
                     .then(result => {
                         if(result){
-                            res.send("corrisponde")
+                            //generazione del jwt per richieste future
+                            const jwtSecretKey = config.jwtSecretKey;
+                            const data = {
+                                userId: usId,
+                                userRole: role,
+                                time: Date()
+                            }
+
+                            const token = jwt.sign(data, jwtSecretKey,{ expiresIn: '24h'});
+
+                            //invio del jwt al client usando un cookie
+                            res.cookie('jwtToken', token, {
+                                httpOnly: true,
+                                secure: false,
+                                maxAge: 24 * 60 * 60 * 1000 //Durata  1 giorno
+                            })
+                            res.status(200).send("Success");
+
                         }
                         else{
-                            return res.status(401).json({ error: 'Invalid Password' });
+                            res.status(401).json({ error: 'Invalid Password' });
                         }
                     })
                     .catch(err => console.error(err.message))
@@ -57,39 +78,28 @@ router.post("/login", (req,res) => {
     });
 
 })
-/*
-// Endpoint per il login dell'utente
-router.post('/login', (req, res) => {
-    const { username, password } = req.body;
 
-    pool.connect((err, client, done) => {
-        if (err) {
-            console.error('Error fetching client from pool', err);
-            return res.status(500).json({ error: 'Database connection error' });
-        }
+//mock function to test verify token
+router.get("/prova", (req,res) => {
+    console.log(verifyToken(req,res))
+    if (Object.keys(verifyToken(req,res)).length !== 0){
+        res.send("andato");
+    }
+    else{
+        return res.status(404).json({ error: 'User not found' });
+    }
+})
 
-        client.query('SELECT username, password FROM users WHERE username = $1', [username], (err, result) => {
-            done();
-
-            if (err) {
-                console.error('Error running query', err);
-                return res.status(500).json({ error: 'Error running query' });
-            }
-
-            if (result.rows.length === 0) {
-                return res.status(404).json({ error: 'User not found' });
-            }
-
-            if (result.rows[0].password === password) {
-                // TODO: Gestione del TOKEN
-                const token = 'someGeneratedToken';
-                res.json({ token });
-            } else {
-                res.status(401).json({ error: 'Invalid password' });
-            }
-        });
-    });
-});*/
+//function to verify the incoming jwt
+function verifyToken(req,res) {
+    const token = req.header('token');
+    if (!token) return {};
+    try {
+        return jwt.verify(token, config.jwtSecretKey);
+    } catch (error) {
+        return {};
+    }
+}
 
 
 module.exports = router
