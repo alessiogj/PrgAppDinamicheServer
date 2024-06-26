@@ -23,8 +23,9 @@ var pool = new Pool({
 
 //endpoint for user login, require an user id and the password for that user
 router.post("/login", (req,res) => {
+    const username = req.body.username;
     const userPassword = req.body.password;
-    const usId = req.body.id;
+
 
     pool.connect(function(err, client, done) {
         if (err) {
@@ -32,7 +33,7 @@ router.post("/login", (req,res) => {
             res.status(500).json({ error: 'Database connection error' });
         }
         //recupero della password hashata nel db e del ruolo dell'utente
-        client.query("SELECT password,user_role from users where cust_code=$1", [usId], function(err, result) {
+        client.query("SELECT user_code,password,user_role from users where username=$1", [username], function(err, result) {
             done();
             if (err) {
                 console.error('error running query', err);
@@ -41,6 +42,7 @@ router.post("/login", (req,res) => {
             if (result.rows.length > 0) {
                 const storedHash = result.rows[0].password;
                 const role = result.rows[0].user_role;
+                const usId = result.rows[0].user_code;
                 bcrypt
                     .compare(userPassword, storedHash)
                     .then(result => {
@@ -48,7 +50,7 @@ router.post("/login", (req,res) => {
                             //generazione del jwt per richieste future
                             const jwtSecretKey = config.jwtSecretKey;
                             const data = {
-                                userId: usId,
+                                userCode: usId,
                                 userRole: role,
                                 time: Date()
                             }
@@ -79,6 +81,16 @@ router.post("/login", (req,res) => {
 
 })
 
+router.get("/getorders", (req,res) => {
+    const requestingUser = verifyToken(req,res);
+    if (Object.keys(requestingUser).length !== 0){
+
+    }
+    else{
+        return res.status(401).json({ error: 'Unauthorized User' });
+    }
+})
+
 //mock function to test verify token
 router.get("/prova", (req,res) => {
     console.log(verifyToken(req,res))
@@ -86,7 +98,7 @@ router.get("/prova", (req,res) => {
         res.send("andato");
     }
     else{
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(401).json({ error: 'Unauthorized User' });
     }
 })
 
