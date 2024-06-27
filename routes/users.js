@@ -15,20 +15,20 @@ router.use(bodyParser.json());
 *  PER DATABASE E EVENTUALMENTE POOL CON METODO CARINO
 * */
 var { Pool } = require('pg');
-var conString = "postgres://postgres:studio@localhost/webUsers";
+var conString = "postgres://postgres:root@localhost:5433/webUsers";
 
 var pool = new Pool({
     connectionString: conString
 });
 
 var{ MainPool } = require('pg');
-var mainConString = "postgres://postgres:studio@localhost/organization"
+var mainConString = "postgres://postgres:root@localhost:5433/organization"
 
 var mainPool = new Pool({
     connectionString: mainConString
 });
 
-//endpoint for user login, require an user id and the password for that user
+//endpoint for user login, require a user id and the password for that user
 router.post("/login", (req,res) => {
     const username = req.body.username;
     const userPassword = req.body.password;
@@ -69,7 +69,7 @@ router.post("/login", (req,res) => {
                                 secure: false,
                                 maxAge: 24 * 60 * 60 * 1000 //Durata  1 giorno
                             })
-                            res.status(200).send("Success");
+                            res.status(200).json("Success");
 
                         }
                         else{
@@ -86,6 +86,26 @@ router.post("/login", (req,res) => {
     });
 
 })
+
+router.get("/getCustomer", (req,res) => {
+    if(true){
+        manageCustomer(req, res);
+    }
+    else if (true && true){
+        manageAgent(req, res);
+    }
+    else{
+        //diregiente
+    }
+})
+
+function manageCustomer(){
+
+}
+
+function manageAgent(){
+
+}
 
 //return for the customer who make the request the corresponding orders with the agent responsible for the orders
 router.get("/getCustomerOrders", (req,res) => {
@@ -161,12 +181,12 @@ router.get("/getAgentOrders", (req,res) => {
 })
 
 //TODO CAPIRE COME STRUTTURARE LA MODIFICA
-router.post("/modifyAgentOrder", (req,res) => {
+router.put("/modifyAgentOrder", (req,res) => {
 
 })
 
 //delete an order held by the agent, use order id to delete the record
-router.post("/deleteAgentOrder", (req,res) => {
+router.delete("/deleteAgentOrder", (req,res) => {
     const order_num = req.body.order_num;
     const requestingUser = verifyToken(req,res);
     if (Object.keys(requestingUser).length !== 0){
