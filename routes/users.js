@@ -29,63 +29,52 @@ var mainPool = new Pool({
 });
 
 //endpoint for user login, require a user id and the password for that user
-router.post("/login", (req,res) => {
-    const username = req.body.username;
-    const userPassword = req.body.password;
+router.post("/login", (req, res) => {
+    const { username, password } = req.body;
 
-    pool.connect(function(err, client, done) {
+    pool.connect((err, client, done) => {
         if (err) {
             console.error('error fetching client from pool', err);
-            res.status(500).json({ error: 'Database connection error' });
+            return res.status(500).json({ error: 'Database connection error' });
         }
-        //recupero della password hashata nel db e del ruolo dell'utente
-        client.query("SELECT user_code,password,user_role from users where username=$1", [username], function(err, result) {
+
+        client.query("SELECT user_code, password, user_role FROM users WHERE username = $1", [username], (err, result) => {
             done();
             if (err) {
                 console.error('error running query', err);
-                res.status(500).json({ error: 'Query to database failed' });
+                return res.status(500).json({ error: 'Query to database failed' });
             }
+
             if (result.rows.length > 0) {
-                const storedHash = result.rows[0].password;
-                const role = result.rows[0].user_role;
-                const usId = result.rows[0].user_code;
-                bcrypt
-                    .compare(userPassword, storedHash)
-                    .then(result => {
-                        if(result){
-                            //generazione del jwt per richieste future
-                            const jwtSecretKey = config.jwtSecretKey;
-                            const data = {
-                                userCode: usId,
-                                userRole: role,
-                                time: Date()
-                            }
+                const { user_code, password: storedHash, user_role } = result.rows[0];
 
-                            const token = jwt.sign(data, jwtSecretKey,{ expiresIn: '24h'});
+                bcrypt.compare(password, storedHash, (err, isMatch) => {
+                    if (err) {
+                        console.error('bcrypt error:', err);
+                        return res.status(500).json({ error: 'Error verifying password' });
+                    }
 
-                            //invio del jwt al client usando un cookie
-                            res.cookie('jwtToken', token, {
-                                httpOnly: true,
-                                secure: false,
-                                maxAge: 24 * 60 * 60 * 1000 //Durata  1 giorno
-                            })
-                            res.status(200).json("Success");
+                    if (isMatch) {
+                        const jwtSecretKey = config.jwtSecretKey;
+                        const tokenData = {
+                            userCode: user_code,
+                            userRole: user_role,
+                            time: Date.now()
+                        };
 
-                        }
-                        else{
-                            res.status(401).json({ error: 'Invalid Password' });
-                        }
-                    })
-                    .catch(err => console.error(err.message))
+                        const token = jwt.sign(tokenData, jwtSecretKey, { expiresIn: '24h' });
+
+                        res.status(200).json({ token });
+                    } else {
+                        res.status(401).json({ error: 'Invalid Password' });
+                    }
+                });
+            } else {
+                res.status(404).json({ error: 'User not found' });
             }
-            else{
-                return res.status(404).json({ error: 'User not found' });
-            }
-
         });
     });
-
-})
+});
 
 router.get("/getCustomer", (req,res) => {
     if(true){
@@ -108,40 +97,41 @@ function manageAgent(){
 }
 
 //return for the customer who make the request the corresponding orders with the agent responsible for the orders
-router.get("/getCustomerOrders", (req,res) => {
-    const requestingUser = verifyToken(req,res);
-    if (Object.keys(requestingUser).length !== 0){
-        const userCode = requestingUser.userCode;
-        if(requestingUser.userRole !== "customer"){
-            res.status(401).json({error: "User is not a customer"})
-        }
-        else {
-            mainPool.connect(function (err, client, done) {
-                if (err) {
-                    console.error('error fetching client from pool', err);
-                    res.status(500).json({error: 'Database connection error'});
-                }
-                //recupero degli ordini dell'utente
-                client.query("SELECT * from orders o join agents a on o.agent_code = a.agent_code where o.cust_code=$1", [userCode], function (err, result) {
-                    done();
-                    if (err) {
-                        console.error('error running query', err);
-                        res.status(500).json({error: 'Query to database failed'});
-                    }
-                    if (result.rows.length > 0) {
-                        console.log(result)
-                        res.json({orders: result.rows})
-                    } else {
-                        return res.status(404).json({error: 'User not found'});
-                    }
-                });
-            });
-        }
-    }
-    else{
+router.get("/getCustomerOrders", async (req, res) => {
+    const requestingUser = verifyToken(req, res);
+
+    if (Object.keys(requestingUser).length === 0) {
         return res.status(401).json({ error: 'Unauthorized User' });
     }
-})
+
+    if (requestingUser.userRole !== "customer") {
+        return res.status(401).json({ error: "User is not a customer" });
+    }
+
+    const userCode = requestingUser.userCode;
+
+    try {
+        const client = await mainPool.connect();
+
+        try {
+            const result = await client.query(
+                "SELECT * FROM orders o JOIN agents a ON o.agent_code = a.agent_code WHERE o.cust_code = $1",
+                [userCode]
+            );
+
+            if (result.rows.length > 0) {
+                return res.json({ orders: result.rows });
+            } else {
+                return res.status(404).json({ error: 'Orders not found for this user' });
+            }
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error('Error executing query', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 //return for the agent who make the request the corresponding orders for whose is responsible with the customer of the order
 router.get("/getAgentOrders", (req,res) => {
@@ -266,13 +256,19 @@ router.post("/addAgentOrder", (req,res) => {
 })
 
 //function to verify the incoming jwt
-function verifyToken(req,res) {
-    const token = req.header('token');
-    if (!token) return {};
+function verifyToken(req, res) {
+    const token = req.header('Authorization') && req.header('Authorization').split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Access denied. No token provided.' });
+    }
+
     try {
-        return jwt.verify(token, config.jwtSecretKey);
+        const decoded = jwt.verify(token, config.jwtSecretKey);
+        req.user = decoded;
+        return decoded;
     } catch (error) {
-        return {};
+        res.status(400).json({ error: 'Invalid token.' });
     }
 }
 
