@@ -76,26 +76,6 @@ router.post("/login", (req, res) => {
     });
 });
 
-router.get("/getCustomer", (req,res) => {
-    if(true){
-        manageCustomer(req, res);
-    }
-    else if (true && true){
-        manageAgent(req, res);
-    }
-    else{
-        //diregiente
-    }
-})
-
-function manageCustomer(){
-
-}
-
-function manageAgent(){
-
-}
-
 //return for the customer who make the request the corresponding orders with the agent responsible for the orders
 router.get("/getCustomerOrders", async (req, res) => {
     const requestingUser = verifyToken(req, res);
