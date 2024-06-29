@@ -11,13 +11,11 @@ const router = express.Router();
 router.use(bodyParser.urlencoded({ extended: true }));
 router.use(bodyParser.json());
 
-const pool = new Pool({
-    connectionString: "postgres://postgres:studio@localhost/webUsers"
-});
+const jwtSecretKeyConfig = config.jwtSecretKey;
+const dbConfig = config.database;
 
-const mainPool = new Pool({
-    connectionString: "postgres://postgres:studio@localhost/organization"
-});
+const poolWebUsers = new Pool(dbConfig.webUsers);
+const poolOrganization = new Pool(dbConfig.organization);
 
 // Middleware to verify token
 const verifyToken = (req, res, next) => {
@@ -26,8 +24,7 @@ const verifyToken = (req, res, next) => {
         return res.status(401).json({ error: 'Access denied. No token provided.' });
     }
     try {
-        const decoded = jwt.verify(token, config.jwtSecretKey);
-        req.user = decoded;
+        req.user = jwt.verify(token, jwtSecretKeyConfig);
         next();
     } catch (error) {
         res.status(400).json({ error: 'Invalid token.' });
@@ -38,7 +35,7 @@ const verifyToken = (req, res, next) => {
 router.post('/login', (req, res) => {
     const { username, password } = req.body;
 
-    pool.connect((err, client, done) => {
+    poolWebUsers.connect((err, client, done) => {
         if (err) {
             console.error('Error fetching client from pool', err);
             return res.status(500).json({ error: 'Database connection error' });
@@ -61,7 +58,7 @@ router.post('/login', (req, res) => {
                     }
 
                     if (isMatch) {
-                        const jwtSecretKey = config.jwtSecretKey;
+                        const jwtSecretKey = jwtSecretKeyConfig;
                         const tokenData = {
                             userCode: user_code,
                             userRole: user_role,
@@ -89,7 +86,7 @@ router.post('/verify-token', (req, res) => {
         return res.status(400).json({ valid: false, message: 'Token is required' });
     }
 
-    jwt.verify(token, config.jwtSecretKey, (err, decoded) => {
+    jwt.verify(token, jwtSecretKeyConfig, (err, decoded) => {
         if (err) {
             return res.status(401).json({ valid: false, message: 'Invalid token' });
         }
@@ -103,27 +100,24 @@ router.get('/getCustomerOrders', verifyToken, async (req, res) => {
         return res.status(401).json({ error: 'User is not a customer' });
     }
 
-    try {
-        const client = await mainPool.connect();
-        try {
-            const result = await client.query(
-                "SELECT * FROM orders o JOIN agents a ON o.agent_code = a.agent_code WHERE o.cust_code = $1",
-                [req.user.userCode]
-            );
-
-            if (result.rows.length > 0) {
-                res.json({ orders: result.rows });
-            } else {
-                res.status(404).json({ error: 'Orders not found for this user' });
+    await poolOrganization.connect(function (err, client, done) {
+            if (err) {
+                console.error('error fetching client from pool', err);
+                res.status(500).json({error: 'Database connection error'});
             }
-        } finally {
-            client.release();
+            //recupero degli ordini dell'utente
+            client.query("SELECT * FROM orders o JOIN agents a ON o.agent_code = a.agent_code WHERE o.cust_code = $1",
+                [req.user.userCode],
+                function (err, result) {
+                    done();
+                    if (err) {
+                        console.error('error running query', err);
+                        res.status(500).json({error: 'Query to database failed'});
+                    }
+                    res.json({orders: result.rows});
+                });
         }
-    } catch (err) {
-        console.error('Error executing query', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
+    )});
 
 // Route to get agent orders
 router.get('/getAgentOrders', verifyToken, async (req, res) => {
@@ -131,55 +125,51 @@ router.get('/getAgentOrders', verifyToken, async (req, res) => {
         return res.status(401).json({ error: 'User is not an agent' });
     }
 
-    try {
-        const client = await mainPool.connect();
-        try {
-            const result = await client.query(
-                "SELECT * FROM orders o JOIN customer c ON o.cust_code = c.cust_code WHERE o.agent_code = $1",
-                [req.user.userCode]
-            );
-
-            if (result.rows.length > 0) {
-                res.json({ orders: result.rows });
-            } else {
-                res.status(404).json({ error: 'Orders not found' });
+    await poolOrganization.connect(function (err, client, done) {
+            if (err) {
+                console.error('error fetching client from pool', err);
+                res.status(500).json({error: 'Database connection error'});
             }
-        } finally {
-            client.release();
+            //recupero degli ordini dell'utente
+            client.query("SELECT * FROM orders o JOIN customer c ON o.cust_code = c.cust_code WHERE o.agent_code = $1",
+                [req.user.userCode],
+                function (err, result) {
+                    done();
+                    if (err) {
+                        console.error('error running query', err);
+                        res.status(500).json({error: 'Query to database failed'});
+                    }
+                    res.json({orders: result.rows});
+
+                });
         }
-    } catch (err) {
-        console.error('Error executing query', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
+    )});
 
 router.put('/modifyAgentOrder', verifyToken, async (req,res) => {
     const updatedOrder = req.body.modifiedOrder;
     if (req.user.userRole !== 'agent') {
         return res.status(401).json({ error: 'User is not an agent' });
     }
-    mainPool.connect(function (err, client, done) {
+    await poolOrganization.connect(function (err, client, done) {
         if (err) {
             console.error('error fetching client from pool', err);
             res.status(500).json({error: 'Database connection error'});
         }
-        //recupero degli ordini dell'utente
         client.query("UPDATE orders SET ord_num = $1, ord_amount = $2, advance_amount = $3, ord_date = $4, cust_code = $5, agent_code = $6, ord_description = $7 WHERE ord_num = $1;",
             [updatedOrder.ord_num, updatedOrder.ord_amount, updatedOrder.advance_amount, updatedOrder.ord_date, updatedOrder.cust_code, updatedOrder.agent_code, updatedOrder.ord_description],
             function (err, result) {
-            done();
-            if (err) {
-                console.error('error running query', err);
-                res.status(500).json({error: 'Query to database failed'});
-            }
-            if (result.rowCount === 1) {
-                res.status(200).json("order modified successfully")
-            } else {
-                return res.status(404).json({error: 'User not found'});
-            }
-        });
+                done();
+                if (err) {
+                    console.error('error running query', err);
+                    res.status(500).json({error: 'Query to database failed'});
+                }
+                if (result.rowCount > 0) {
+                    res.status(200).json("order modified successfully")
+                } else {
+                    return res.status(404).json({error: 'User not found'});
+                }
+            });
     });
-
 })
 
 // Route to delete an agent order
@@ -187,59 +177,51 @@ router.delete('/deleteAgentOrder', verifyToken, async (req, res) => {
     if (req.user.userRole !== 'agent') {
         return res.status(401).json({ error: 'User is not an agent' });
     }
-
-    const { order_num } = req.body;
-
-    try {
-        const client = await mainPool.connect();
-        try {
-            const result = await client.query(
-                "DELETE FROM orders WHERE ord_num = $1 AND agent_code = $2",
-                [order_num, req.user.userCode]
-            );
-
-            if (result.rowCount === 1) {
-                res.status(200).json('Order deleted successfully');
-            } else {
-                res.status(404).json({ error: 'Order not found' });
-            }
-        } finally {
-            client.release();
+    await poolOrganization.connect(function (err, client, done) {
+        if (err) {
+            console.error('error fetching client from pool', err);
+            res.status(500).json({error: 'Database connection error'});
         }
-    } catch (err) {
-        console.error('Error running query', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+        client.query("DELETE FROM orders WHERE ord_num = $1;",
+            [req.body.ord_num],
+            function (err, result) {
+                done();
+                if (err) {
+                    console.error('error running query', err);
+                    res.status(500).json({error: 'Query to database failed'});
+                } else if (result.rowCount > 0) {
+                    res.status(200).json({message: "Order deleted successfully"});
+                } else {
+                    res.status(404).json({error: 'Order not found'});
+                }
+            });
+    });
 });
 
 // Route to add an agent order
 router.post('/addAgentOrder', verifyToken, async (req, res) => {
+    const newOrder = req.body.newOrder;
     if (req.user.userRole !== 'agent') {
         return res.status(401).json({ error: 'User is not an agent' });
     }
 
-    const newOrder = req.body.order;
-
-    try {
-        const client = await mainPool.connect();
-        try {
-            const result = await client.query(
-                "INSERT INTO orders (ord_num, ord_amount, advance_amount, ord_date, cust_code, agent_code, ord_description) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                [newOrder.ord_num, newOrder.ord_amount, newOrder.advance_amount, newOrder.ord_date, newOrder.cust_code, newOrder.agent_code, newOrder.ord_description]
-            );
-
-            if (result.rowCount === 1) {
-                res.status(200).json('Order inserted successfully');
-            } else {
-                res.status(500).json({ error: 'Failed to insert order' });
-            }
-        } finally {
-            client.release();
+    await poolOrganization.connect(function (err, client, done) {
+        if (err) {
+            console.error('error fetching client from pool', err);
+            res.status(500).json({error: 'Database connection error'});
         }
-    } catch (err) {
-        console.error('Error running query', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+        client.query("INSERT INTO orders (ord_num, ord_amount, advance_amount, ord_date, cust_code, agent_code, ord_description) VALUES ($1, $2, $3, $4, $5, $6, $7);",
+            [newOrder.ord_num, newOrder.ord_amount, newOrder.advance_amount, newOrder.ord_date, newOrder.cust_code, newOrder.agent_code, newOrder.ord_description],
+            function (err, result) {
+                done();
+                if (err) {
+                    console.error('error running query', err);
+                    res.status(500).json({error: 'Query to database failed'});
+                } else {
+                    res.status(200).json({message: "Order added successfully"});
+                }
+            });
+    });
 });
 
 module.exports = router;
