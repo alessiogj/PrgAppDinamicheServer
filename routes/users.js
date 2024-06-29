@@ -1,10 +1,9 @@
 const express = require('express');
-const { json } = require('express');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
 const config = require('../config');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const { poolWebUsers, poolOrganization } = require('../db');
 
 const router = express.Router();
 
@@ -12,10 +11,6 @@ router.use(bodyParser.urlencoded({ extended: true }));
 router.use(bodyParser.json());
 
 const jwtSecretKeyConfig = config.jwtSecretKey;
-const dbConfig = config.database;
-
-const poolWebUsers = new Pool(dbConfig.webUsers);
-const poolOrganization = new Pool(dbConfig.organization);
 
 // Middleware to verify token
 const verifyToken = (req, res, next) => {

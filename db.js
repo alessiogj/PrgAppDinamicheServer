@@ -1,15 +1,26 @@
+// db.js
 const { Pool } = require('pg');
+const config = require('./config');
 
-const pool = new Pool({
-    user: 'postgres',
-    host: 'localhost',
-    database: 'webUsers',
-    password: 'studio',
-    port: 5432,
+const dbConfig = config.database;
+
+const poolWebUsers = new Pool({
+    user: dbConfig.webUsers.user,
+    host: dbConfig.webUsers.host,
+    database: dbConfig.webUsers.database,
+    password: dbConfig.webUsers.password,
+    port: dbConfig.webUsers.port,
+});
+
+const poolOrganization = new Pool({
+    user: dbConfig.organization.user,
+    host: dbConfig.organization.host,
+    database: dbConfig.organization.database,
+    password: dbConfig.organization.password,
+    port: dbConfig.organization.port,
 });
 
 module.exports = {
-    query: (text, params, callback) => {
-        return pool.query(text, params, callback);
-    },
+    poolWebUsers,
+    poolOrganization,
 };
