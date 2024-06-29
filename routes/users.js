@@ -7,17 +7,16 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 
 const router = express.Router();
-const saltRounds = 10;
 
 router.use(bodyParser.urlencoded({ extended: true }));
 router.use(bodyParser.json());
 
 const pool = new Pool({
-    connectionString: process.env.WEB_USERS_DB || "postgres://postgres:studio@localhost/webUsers"
+    connectionString: "postgres://postgres:studio@localhost/webUsers"
 });
 
 const mainPool = new Pool({
-    connectionString: process.env.ORGANIZATION_DB || "postgres://postgres:studio@localhost/organization"
+    connectionString: "postgres://postgres:studio@localhost/organization"
 });
 
 // Middleware to verify token
@@ -26,31 +25,14 @@ const verifyToken = (req, res, next) => {
     if (!token) {
         return res.status(401).json({ error: 'Access denied. No token provided.' });
     }
-
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY || config.jwtSecretKey);
+        const decoded = jwt.verify(token, config.jwtSecretKey);
         req.user = decoded;
         next();
     } catch (error) {
         res.status(400).json({ error: 'Invalid token.' });
     }
 };
-
-// Route to verify the token
-router.post('/verify-token', (req, res) => {
-    const token = req.body.token;
-    if (!token) {
-        return res.status(400).json({ valid: false, message: 'Token is required' });
-    }
-
-    jwt.verify(token, process.env.JWT_SECRET_KEY || config.jwtSecretKey, (err, decoded) => {
-        if (err) {
-            return res.status(401).json({ valid: false, message: 'Invalid token' });
-        }
-        return res.status(200).json({ valid: true });
-    });
-});
-
 
 // Endpoint for user login
 router.post('/login', (req, res) => {
@@ -79,7 +61,7 @@ router.post('/login', (req, res) => {
                     }
 
                     if (isMatch) {
-                        const jwtSecretKey = process.env.JWT_SECRET_KEY || config.jwtSecretKey;
+                        const jwtSecretKey = config.jwtSecretKey;
                         const tokenData = {
                             userCode: user_code,
                             userRole: user_role,
@@ -97,6 +79,21 @@ router.post('/login', (req, res) => {
                 res.status(404).json({ error: 'User not found' });
             }
         });
+    });
+});
+
+// Route to verify the token
+router.post('/verify-token', (req, res) => {
+    const token = req.body.token;
+    if (!token) {
+        return res.status(400).json({ valid: false, message: 'Token is required' });
+    }
+
+    jwt.verify(token, config.jwtSecretKey, (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ valid: false, message: 'Invalid token' });
+        }
+        return res.status(200).json({ valid: true });
     });
 });
 
@@ -155,6 +152,35 @@ router.get('/getAgentOrders', verifyToken, async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+router.put('/modifyAgentOrder', verifyToken, async (req,res) => {
+    const updatedOrder = req.body.modifiedOrder;
+    if (req.user.userRole !== 'agent') {
+        return res.status(401).json({ error: 'User is not an agent' });
+    }
+    mainPool.connect(function (err, client, done) {
+        if (err) {
+            console.error('error fetching client from pool', err);
+            res.status(500).json({error: 'Database connection error'});
+        }
+        //recupero degli ordini dell'utente
+        client.query("UPDATE orders SET ord_num = $1, ord_amount = $2, advance_amount = $3, ord_date = $4, cust_code = $5, agent_code = $6, ord_description = $7 WHERE ord_num = $1;",
+            [updatedOrder.ord_num, updatedOrder.ord_amount, updatedOrder.advance_amount, updatedOrder.ord_date, updatedOrder.cust_code, updatedOrder.agent_code, updatedOrder.ord_description],
+            function (err, result) {
+            done();
+            if (err) {
+                console.error('error running query', err);
+                res.status(500).json({error: 'Query to database failed'});
+            }
+            if (result.rows.length > 0) {
+                res.status(200).json("order modified successfully")
+            } else {
+                return res.status(404).json({error: 'User not found'});
+            }
+        });
+    });
+
+})
 
 // Route to delete an agent order
 router.delete('/deleteAgentOrder', verifyToken, async (req, res) => {
