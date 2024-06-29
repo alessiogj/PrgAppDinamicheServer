@@ -172,7 +172,7 @@ router.put('/modifyAgentOrder', verifyToken, async (req,res) => {
                 console.error('error running query', err);
                 res.status(500).json({error: 'Query to database failed'});
             }
-            if (result.rows.length > 0) {
+            if (result.rowCount === 1) {
                 res.status(200).json("order modified successfully")
             } else {
                 return res.status(404).json({error: 'User not found'});
