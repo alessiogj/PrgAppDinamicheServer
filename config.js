@@ -7,15 +7,15 @@ module.exports = {
             user: "postgres",
             host: "localhost",
             database: "webUsers",
-            password: "root",
-            port: 5433
+            password: "studio",
+            port: 5432
         },
         organization: {
             user: "postgres",
             host: "localhost",
             database: "organization",
-            password: "root",
-            port: 5433
+            password: "studio",
+            port: 5432
         }
     }
 };
