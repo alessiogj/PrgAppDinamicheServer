@@ -13,11 +13,11 @@ router.use(bodyParser.urlencoded({ extended: true }));
 router.use(bodyParser.json());
 
 const pool = new Pool({
-    connectionString: process.env.WEB_USERS_DB || "postgres://postgres:root@localhost:5433/webUsers"
+    connectionString: process.env.WEB_USERS_DB || "postgres://postgres:studio@localhost/webUsers"
 });
 
 const mainPool = new Pool({
-    connectionString: process.env.ORGANIZATION_DB || "postgres://postgres:root@localhost:5433/organization"
+    connectionString: process.env.ORGANIZATION_DB || "postgres://postgres:studio@localhost/organization"
 });
 
 // Middleware to verify token
