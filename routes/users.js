@@ -126,7 +126,7 @@ router.get('/getAgentOrders', verifyToken, async (req, res) => {
                 res.status(500).json({error: 'Database connection error'});
             }
             //recupero degli ordini dell'utente
-            client.query("SELECT * FROM orders o JOIN customer c ON o.cust_code = c.cust_code WHERE o.agent_code = $1",
+            client.query("SELECT * FROM orders o  customer c ON o.cust_code = c.cust_code WHERE o.agent_code = $1",
                 [req.user.userCode],
                 function (err, result) {
                     done();
@@ -134,8 +134,9 @@ router.get('/getAgentOrders', verifyToken, async (req, res) => {
                         console.error('error running query', err);
                         res.status(500).json({error: 'Query to database failed'});
                     }
-                    res.json({orders: result.rows});
-
+                    else {
+                        res.json({orders: result.rows});
+                    }
                 });
         }
     )});
@@ -158,10 +159,12 @@ router.put('/modifyAgentOrder', verifyToken, async (req,res) => {
                     console.error('error running query', err);
                     res.status(500).json({error: 'Query to database failed'});
                 }
-                if (result.rowCount > 0) {
-                    res.status(200).json("order modified successfully")
-                } else {
-                    return res.status(404).json({error: 'User not found'});
+                else {
+                    if (result.rowCount > 0) {
+                        res.status(200).json("order modified successfully")
+                    } else {
+                        return res.status(404).json({error: 'User not found'});
+                    }
                 }
             });
     });
