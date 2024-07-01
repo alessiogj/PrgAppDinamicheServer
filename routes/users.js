@@ -208,6 +208,8 @@ router.delete('/deleteAgentOrder', verifyToken, async (req, res) => {
 // Route to add an agent order
 router.post('/addAgentOrder', verifyToken, async (req, res) => {
     const newOrder = req.body.newOrder;
+    const newCode = await generateOrderCode();
+
     if (req.user.userRole !== 'agent') {
         return res.status(401).json({ error: 'User is not an agent' });
     }
@@ -219,7 +221,7 @@ router.post('/addAgentOrder', verifyToken, async (req, res) => {
         }
         else{
         client.query("INSERT INTO orders (ord_num, ord_amount, advance_amount, ord_date, cust_code, agent_code, ord_description) VALUES ($1, $2, $3, $4, $5, $6, $7);",
-            [newOrder.ord_num, newOrder.ord_amount, newOrder.advance_amount, newOrder.ord_date, newOrder.cust_code, newOrder.agent_code, newOrder.ord_description],
+            [newCode, newOrder.ord_amount, newOrder.advance_amount, newOrder.ord_date, newOrder.cust_code, newOrder.agent_code, newOrder.ord_description],
             function (err, result) {
                 done();
                 if (err) {
@@ -312,5 +314,27 @@ router.put('/modifyDirigentOrder', verifyToken, async (req,res) => {
     });
 })
 
+
+async function generateOrderCode() {
+    return new Promise((resolve, reject) => {
+        poolOrganization.connect((err, client, done) => {
+            if (err) {
+                console.error('Error fetching client from pool', err);
+                reject(err);
+            } else {
+                client.query("SELECT ord_num FROM orders ORDER BY ord_num DESC LIMIT 1", (err, result) => {
+                    done();
+                    if (err) {
+                        console.error('Error running query', err);
+                        reject(err);
+                    } else {
+                        const ordNum = result.rows[0]?.ord_num + 1;
+                        resolve(ordNum);
+                    }
+                });
+            }
+        });
+    });
+}
 
 module.exports = router;
