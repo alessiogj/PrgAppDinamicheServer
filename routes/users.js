@@ -274,7 +274,7 @@ router.get('/getDirigentOrders', verifyToken, async (req,res) => {
                 console.error('error fetching client from pool', err);
                 res.status(500).json({error: 'Database connection error'});
             } else {
-                client.query("select o.*, c.cust_code as cust_custcode, c.cust_name, c.cust_city, c.working_area, c.cust_country, c.grade, c.opening_amt, c.receive_amt, c.payment_amt, c.outstanding_amt, c.phone_no, c.agent_code as cust_agentcode, a.agent_code as agent_agentcode, a.agent_name, a.working_area, a.commission, a.phone_no, a.country from orders o join customer c on o.cust_code = c.cust_code join agents a on o.agent_code = a.agent_code", function (err, result) {
+                client.query("select o.*, c.cust_code as cust_custcode, c.cust_name, c.cust_city, c.working_area as cust_workingarea, c.cust_country as cust_country, c.grade, c.opening_amt, c.receive_amt, c.payment_amt, c.outstanding_amt, c.phone_no as cust_phoneno, c.agent_code as cust_agentcode, a.agent_code as agent_agentcode, a.agent_name, a.working_area as agent_workingarea, a.commission, a.phone_no as agent_phoneno, a.country as agent_country from orders o join customer c on o.cust_code = c.cust_code join agents a on o.agent_code = a.agent_code", function (err, result) {
                     done();
                     if (err) {
                         console.error('error running query', err);
