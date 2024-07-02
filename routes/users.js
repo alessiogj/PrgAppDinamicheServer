@@ -132,7 +132,7 @@ router.get('/getAgentOrders', verifyToken, async (req, res) => {
                     res.status(500).json({error: 'Database connection error'});
                 } else {
                     //recupero degli ordini dell'utente
-                    client.query("SELECT * FROM orders o JOIN customer c ON o.cust_code = c.cust_code WHERE o.agent_code = $1",
+                    client.query("SELECT o.*,c.cust_code, c.cust_name, c.cust_city, c.working_area, c.cust_country, c.grade, c.opening_amt, c.receive_amt, c.payment_amt, c.outstanding_amt, c.phone_no, c.agent_code as cust_agentcode  FROM orders o JOIN customer c ON o.cust_code = c.cust_code WHERE o.agent_code = $1",
                         [req.user.userCode],
                         function (err, result) {
                             done();
@@ -211,6 +211,7 @@ router.delete('/deleteAgentOrder', verifyToken, async (req, res) => {
 // Route to add an agent order
 router.post('/addAgentOrder', verifyToken, async (req, res) => {
     const newOrder = req.body.newOrder;
+    console.log(newOrder);
     const newCode = await generateOrderCode();
 
     if (req.user.userRole !== 'agent') {
