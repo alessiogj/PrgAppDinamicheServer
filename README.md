@@ -2,11 +2,12 @@
 > Progetto per il corso di Applicazioni Dinamiche per il Web (2023/2024)
 > dell'Università degli Studi di Verona.
 
-Il sistema software è stato progettato per gestire gli ordini di una società commerciale.
-Il sistema è composto da tre tipi di utenti: clienti, agenti e dirigenti. 
-I clienti possono visualizzare i propri ordini, gli agenti possono visualizzare
-e modificare gli ordini dei propri clienti e i dirigenti possono visualizzare e
-modificare tutti gli ordini.
+>Il sistema software è stato progettato per gestire gli ordini di una società commerciale.
+>Il sistema è composto da tre tipi di utenti: clienti, agenti e dirigenti. 
+>I clienti possono visualizzare i propri ordini, gli agenti possono visualizzare
+>e modificare gli ordini dei propri clienti e i dirigenti possono visualizzare e
+>modificare tutti gli ordini.
+
 ---
 ## Indice
 2. [🚀 Avviare il progetto](#avviare-il-progetto)
