@@ -1,9 +1,8 @@
 const express = require('express');
-var createError = require('http-errors');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
-const userRouter = require("./routes/users")
+const userRouter = require("./routes/customers")
+const agentRouter = require("./routes/agents")
+const dirigentRouter = require("./routes/dirigents")
+const authRouter = require("./routes/auth")
 const {urlencoded, json} = require("body-parser");
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -17,7 +16,10 @@ app.use(cors());
 app.use(urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-app.use("/users", userRouter)
+app.use("/customers", userRouter)
+app.use("/agents", agentRouter)
+app.use("/dirigents", dirigentRouter)
+app.use("/auth", authRouter)
 
 app.listen(3100)
 
