@@ -154,7 +154,7 @@ router.get('/getAvailableCustomers', verifyToken, async (req,res) => {
                 console.error('error fetching client from pool', err);
                 res.status(500).json({error: 'Database connection error'});
             } else {
-                client.query("select cust_code from customer", function (err, result) {
+                client.query("select cust_code from customer where agent_code = $1", [req.user.userCode], function (err, result) {
                     done();
                     if (err) {
                         console.error('error running query', err);
