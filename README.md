@@ -219,7 +219,7 @@ Aggiunge un nuovo ordine.
 
 ### `GET /agents/getAvailableCustomers`
 
-Restituisce tutti i clienti disponibili.
+Restituisce tutti i clienti disponibili per un agente.
 
 **Richiesta:**
 - Header `Authorization: Bearer <jwtToken>`
