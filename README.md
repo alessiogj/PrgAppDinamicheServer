@@ -245,18 +245,6 @@ Restituisce tutti gli ordini.
 - `401 Unauthorized` se il token non è valido.
 - `500 Internal Server Error` Se c'è un errore interno al database.
 ---
-### `GET /agents/getAvailableCustomers`
-
-Restituisce tutti i clienti disponibili.
-
-**Richiesta:**
-- Header `Authorization: Bearer <jwtToken>`
-
-**Risposta:**
-- `200 OK` con un array di clienti.
-- `401 Unauthorized` se il token non è valido.
-- `500 Internal Server Error` Se c'è un errore interno al database.
----
 ### `PUT /dirigents/modifyOrder`
 
 Modifica un ordine esistente.

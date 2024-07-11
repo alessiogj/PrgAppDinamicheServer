@@ -32,35 +32,6 @@ const verifyToken = (req, res, next) => {
 };
 
 /**
- * Rotta per ottenere i clienti disponibili per l'agente
- * @route GET /getAvailableCustomers
- * @param {Object} req - Oggetto richiesta di Express
- * @param {Object} res - Oggetto risposta di Express
- */
-router.get('/getAvailableCustomers', verifyToken, async (req, res) => {
-    if (req.user.userRole !== 'agent') {
-        return res.status(401).json({ error: 'L\'utente non è un agente' });
-    } else {
-        await poolOrganization.connect(function (err, client, done) {
-            if (err) {
-                console.error('Errore nel recuperare il client dal pool', err);
-                res.status(500).json({ error: 'Errore di connessione al database' });
-            } else {
-                client.query("SELECT cust_code FROM customer", function (err, result) {
-                    done();
-                    if (err) {
-                        console.error('Errore nell\'esecuzione della query', err);
-                        res.status(500).json({ error: 'Errore nella query al database' });
-                    } else {
-                        res.json({ customers: result.rows });
-                    }
-                });
-            }
-        });
-    }
-});
-
-/**
  * Rotta per ottenere tutti gli ordini per un dirigente
  * @route GET /getOrders
  * @param {Object} req - Oggetto richiesta di Express
